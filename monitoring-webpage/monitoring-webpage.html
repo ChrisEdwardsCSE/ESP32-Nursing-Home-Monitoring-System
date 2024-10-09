@@ -1,0 +1,43 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Residents Monitoring</title>
+    <link rel="stylesheet" href="monitoring-webpage.css" />
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  </head>
+  <body>
+    <h1>Residents</h1>
+    <h2>Emergency</h2>
+    <div class="emergency-residents">
+      <div class="resident" id="id1">
+        <p class="res-name">Daniel Smith</p>
+        <p class="res-heart-rate">Heart Rate: 60bpm</p>
+        <p class="res-fall-detected">Fall? </p>
+      </div>
+    </div>
+
+    <h2>Healthy</h2>
+    <div class="healthy-residents">
+
+      <div class="resident" id="id0">
+        <p class="res-name">John Doe</p>
+        <p class="res-heart-rate">Heart Rate: 60bpm</p>
+        <p class="res-fall-detected">Fall? </p>
+      </div>
+    </div>
+
+    <ul class="healthy-residents">
+      <li class="form-row">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="10" readonly></textarea>
+      </li>
+    </ul>
+
+    <button class="click-button">click</button>
+    <script src="monitoring-webpage.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+.DS_Store
+device/build/
+station/build/
+*.bin
+*.out
+*.target
+*.o
+*/sdkconfig.old
+*/sdkconfig.*
+*.lock
+*.py
+*.json
+*.log
