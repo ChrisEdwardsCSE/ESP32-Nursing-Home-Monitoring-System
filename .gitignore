@@ -11,3 +11,5 @@ station/build/
 *.py
 *.json
 *.log
+*.projbuild
+*.yml
