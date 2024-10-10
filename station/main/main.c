@@ -33,14 +33,17 @@
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
 #include "driver/i2c_slave.h"
+#include "driver/gptimer.h"
+
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 #include "main.h"
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
-QueueHandle_t q_res_data; // Queue to hold incoming Resident data
+QueueHandle_t g_res_mqtt_queue; // Queue to hold incoming Resident data
 
 TaskHandle_t mqtt_app_start_task_handle;
 TaskHandle_t wifi_mqtt_send_msg_handle;
@@ -56,6 +59,8 @@ esp_mqtt_client_handle_t mqtt_client;
 #define TCP_FAIL 1 << 1
 
 #define MAX_FAILURES 10 // Maximum number of connection attempts
+
+#define MQTT_SERVE_WEBPAGE_PERIOD 20000000
 
 // Tags for ESP_LOGI statements
 static const char *BLE_TAG = "BLE";
@@ -73,6 +78,8 @@ struct res_data_t {
     uint8_t fall_detected:1;
 } res_data;
 
+uint8_t g_res_ble_arr[MAX_NUM_RESIDENTS]; // DS to store whether we've received BLE signal for resident with ID
+
 void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init()); // BLE & WiFi use NVS Flash
@@ -82,9 +89,49 @@ void app_main(void)
     ble_hs_cfg.sync_cb = ble_app_on_sync; // Set callback for Host & Controller sync
     nimble_port_freertos_init(host_task); // Set infinite task
 
-    q_res_data = xQueueCreate(7, 50);
+    g_res_mqtt_queue = xQueueCreate(MAX_NUM_RESIDENTS, 50);
 
     wifi_init_sta(); // Configure and initialize WiFi
+
+    mqtt_send_timer();
+}
+
+static bool timer_alarm_cb(gptimer_handle_t timer, const gptimer_alarm_event_data_t *event_data, void *args)
+{
+    BaseType_t b_context_switch = pdFALSE;
+    vTaskNotifyGiveFromISR(wifi_mqtt_send_msg_handle, &b_context_switch);
+
+    portYIELD_FROM_ISR(b_context_switch);
+
+    return (pdTRUE == b_context_switch);
+}
+
+void mqtt_send_timer(void) 
+{
+    gptimer_handle_t timer_handle;
+
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 500000
+    };
+    gptimer_new_timer(&timer_config, &timer_handle);
+
+    gptimer_alarm_config_t timer_alarm_config = {
+        .alarm_count = 10000000,
+        .reload_count = 0,
+        .flags.auto_reload_on_alarm = 0,
+    };
+    gptimer_set_alarm_action(timer_handle, &timer_alarm_config);
+
+    gptimer_event_callbacks_t timer_event_callbacks = {
+        .on_alarm = timer_alarm_cb
+    };
+    gptimer_register_event_callbacks(timer_handle, &timer_event_callbacks, NULL);
+
+    gptimer_enable(timer_handle);
+    gptimer_start(timer_handle);
+    ESP_LOGI(BLE_TAG, "started timer");
 }
 
 
@@ -123,7 +170,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 esp_err_t esp_error;
-
 /**
  * IP event handler
  * @param event_base - base type of event, should be IP_EVENT
@@ -150,6 +196,7 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
 void wifi_mqtt_send_msg(void*)
 {
     uint8_t first_time = 1; // First time connecting to WiFi flag
+    ESP_LOGI(WIFI_TAG, "entered wifi_mqtt_send_msg");
     for(;;) {
         s_wifi_event_group = xEventGroupCreate();
     
@@ -178,6 +225,7 @@ void wifi_mqtt_send_msg(void*)
          * we connect/reconnect to WiFi
          */
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        // ESP_LOGI(WIFI_TAG, "starting itttt ig timer ended");
         if (first_time) {
             esp_wifi_start(); // Start (connect for the first time) the WiFi driver
             ESP_LOGI(WIFI_TAG, "esp_wifi_start: %d", (int)esp_error);
@@ -234,13 +282,14 @@ void wifi_mqtt_send_msg(void*)
 void wifi_init_sta(void)
 {   
     // TODO: Handle if attempting to connect to a new WiFi
-
+    // ESP_LOGI(WIFI_TAG, "0");
     ESP_ERROR_CHECK(esp_netif_init()); // Initialize TCP/IP stack
-
+    // vTaskDelay(pdMS_TO_TICKS(40));
+    // ESP_LOGI(WIFI_TAG, "1");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    
-    esp_netif_t* esp_netif = esp_netif_create_default_wifi_sta(); // Create default WiFi station
 
+    esp_netif_t* esp_netif = esp_netif_create_default_wifi_sta(); // Create default WiFi station
+    // ESP_LOGI(WIFI_TAG, "2");
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg)); 
 
@@ -259,14 +308,15 @@ void wifi_init_sta(void)
             },
         },
     };
-
+    // ESP_LOGI(WIFI_TAG, "3");
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA)); // Set WiFi to be a station
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config)); // Configure WiFi
-    
+    // ESP_LOGI(WIFI_TAG, "4");
+    // vTaskDelay(pdMS_TO_TICKS(200));
+
     // Create ask to connect to WiFi, send MQTT messages, and disconnect between BLE readings
     xTaskCreate(wifi_mqtt_send_msg, "Connect WiFi and Send MQTT",
                 8192, NULL, configMAX_PRIORITIES-1, &wifi_mqtt_send_msg_handle);
-    
 }
 
 /**
@@ -287,11 +337,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     char mqtt_send_data_buf[50];
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
-        xQueueReceive(q_res_data, mqtt_send_data_buf, pdMS_TO_TICKS(100)); // Get resident data off the queue
-
-        msg_id = esp_mqtt_client_publish(client, "residents", (char *)mqtt_send_data_buf, 50, 1, 0); // Publish it
-
-        ESP_LOGI(WIFI_TAG, "sent publish successful, msg_id=%d", msg_id);
+        // Send all messages on queue over MQTT
+        // while (xQueueReceive(g_res_mqtt_queue, mqtt_send_data_buf, pdMS_TO_TICKS(100))) {
+        //     msg_id = esp_mqtt_client_publish(client, "residents", (char *)mqtt_send_data_buf, 50, 1, 0); // Publish it
+        //     // g_res_ble_arr[id] = 0; // Reset the have data flag of the resident we just published for
+        // }
+        int result = xQueueReceive(g_res_mqtt_queue, mqtt_send_data_buf, portMAX_DELAY);
+        if (result) {
+            ESP_LOGI(WIFI_TAG, "found item");
+        }
+        msg_id = esp_mqtt_client_publish(client, "residents", (char *)mqtt_send_data_buf, 50, 1, 0);
+        ESP_LOGI(WIFI_TAG, "sent publish successful: %d", msg_id);
         break;
     case MQTT_EVENT_DISCONNECTED:
         if (!s_mqtt_published_flag) {
@@ -335,11 +391,8 @@ static void mqtt_app_start(void)
     esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL); // Register MQTT event handler cb
 
     esp_mqtt_client_start(mqtt_client);
-
 }
 
-
-uint8_t g_res_arr[MAX_NUM_RESIDENTS]; // DS to store whether we've received BLE signal for resident with ID
 /**
  * BLE GAP event handler. 
  * 
@@ -357,25 +410,41 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         // Discovery event (received advertisement)
         case BLE_GAP_EVENT_DISC:
             ble_hs_adv_parse_fields(&fields, event->disc.data, event->disc.length_data);
-
             /**
              * name = "Smart-Nursing-Home-Device"
              * mfg_data = Resident's Name
              * mfd_data_len = Length of Resident's Name
+             * uint8_t uri_len = Resident ID
              * uint8_t le_role = Measured Heart Rate
              * unsigned le_role_is_present = Fall Detection flag
              * uint8_t *uri = oxygen level "XX.X%"
              */
-            if (strncmp("Smart-Nursing-Home-Device", (char *)fields.name, (size_t)fields.name_len)) {
-                /*** Parse the fields into a message to send ***/
-                // "First Last, ID, <HR>, 1";
-                snprintf(res_data_buf, 50, "%*s, %u, %u, %u", fields.mfg_data_len, fields.mfg_data, fields.uri_len, fields.le_role, fields.le_role_is_present);
 
-                xQueueSend(q_res_data, res_data_buf, pdMS_TO_TICKS(100));
-                
-                ble_gap_disc_cancel();
-                vTaskDelay(pdMS_TO_TICKS(10));
-                xTaskNotifyGive(wifi_mqtt_send_msg_handle);
+            if (fields.name_len > 0) {
+                ESP_LOGI(BLE_TAG, "BLE device found: %*s", fields.name_len, fields.name);
+                if (!strncmp((char *)fields.name, "ESP32-Ched", 10)) {
+                    /*** Parse the fields into a message to send ***/
+                    // "First Last, ID, <HR>, 1";
+                    snprintf(res_data_buf, 50, "%*s, %u, %u, %u", fields.mfg_data_len, fields.mfg_data, fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    ESP_LOGI(BLE_TAG, "Resident info received: %*s", fields.mfg_data_len, fields.mfg_data);
+                    // if ( fields.le_role_is_present || 
+                    // ( (fields.le_role <= HR_LOWER_THRESHOLD) || (fields.le_role >= HR_UPPER_THRESHOLD) ) ) {
+                    if (!strncmp((char *)fields.mfg_data, "John Doe", 8)) {
+                        // Emergency, immediately send to webpage
+                        ESP_LOGI(BLE_TAG, "emergency mqtt send to queue!!");
+                        xQueueSendToFront(g_res_mqtt_queue, res_data_buf, portMAX_DELAY);
+                        ble_gap_disc_cancel();
+                        vTaskDelay(pdMS_TO_TICKS(10));
+                        xTaskNotifyGive(wifi_mqtt_send_msg_handle);
+                    }
+                    else {
+                        if (!g_res_ble_arr[fields.uri_len]) { // if don't yet have resident's (healthy) data
+                            xQueueSend(g_res_mqtt_queue, res_data_buf, pdMS_TO_TICKS(10)); // Add Resident's data to Queue
+                            g_res_ble_arr[fields.uri_len] = 1; // 
+                        }
+
+                    }
+                }
             }
             break;
         default:

@@ -49,6 +49,7 @@ void max30102_int_handle(i2c_master_dev_handle_t master_dev_handle)
     uint8_t read_int_buf[2]; // Read both Interrupt Status Registers 1 & 2
     i2c_master_transmit_receive(master_dev_handle, int_source_buf, 1,
                                 read_int_buf, 2, 100);
+    ESP_LOGI("max", "0");
     // if PWR_RDY interrupt
     if (read_int_buf[0] & 0x1)
     {
@@ -56,7 +57,6 @@ void max30102_int_handle(i2c_master_dev_handle_t master_dev_handle)
         printf("max30102_int_handle(): power ready: 0x%X, 0x%X\n", read_int_buf[0], read_int_buf[1]);
 #endif
     }
-    ESP_LOGI("max30102", "max_int_handle");
 }
 
 /**

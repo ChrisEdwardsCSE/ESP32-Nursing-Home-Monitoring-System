@@ -31,7 +31,7 @@ TaskHandle_t sample_hr_handle;
 
 uint8_t ble_addr_type;
 
-uint8_t green_led_val;
+uint8_t green_led_val = 1;
 
 TaskHandle_t ble_advertise_task_handle;
 
@@ -59,17 +59,17 @@ static void IRAM_ATTR adxl_int1_isr_handler(void *arg)
     
     res_data.fall_detected = 1; // Set Fall Detection to 1
 
-    vTaskNotifyGiveFromISR(ble_advertise_task_handle, NULL); // Start advertising emergency with Fall Detection set
-
     gpio_set_level(GPIO_NUM_1, green_led_val);
     green_led_val = !green_led_val;
+
+    vTaskNotifyGiveFromISR(ble_advertise_task_handle, NULL); // Start advertising emergency with Fall Detection set
 }
 
 void app_main()
 {
     nvs_flash_init(); // Initialize NVS flash using
     nimble_port_init(); // Initialize the controller stack
-    ble_svc_gap_device_name_set("Smart-Nursing-Home-Device"); // Set device name characteristic
+    ble_svc_gap_device_name_set("ESP32-Ched"); // Set device name characteristic
     ble_svc_gap_init(); // Initialize GAP service
     ble_hs_cfg.sync_cb = ble_app_on_sync; // Set application as callback
     nimble_port_freertos_init(host_task); // Set infinite task
@@ -148,10 +148,11 @@ void ble_app_advertise(void *)
 
         // Configure and begin advertising for 30 seconds
         ble_gap_adv_set_fields(&fields);
+        ESP_LOGI(BLE_TAG, "name: %*s", fields.name_len, fields.name);
         int rc = ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &adv_params, ble_gap_event, NULL);
         ESP_LOGI(BLE_TAG, "Started GAP advertising: %d", rc);
 
-        vTaskDelay(pdMS_TO_TICKS(30000));
+        vTaskDelay(pdMS_TO_TICKS(10000));
 
         rc = ble_gap_adv_stop();
         ESP_LOGI(BLE_TAG, "Stopped GAP advertising: %d", rc);
@@ -196,6 +197,7 @@ void sample_hr(void*)
     float pn_spo2;
     int8_t spo2_valid;
     float ratio, correl;
+    res_data.heart_rate = 80;
 
     for (;;) {
         // Take samples
@@ -207,21 +209,22 @@ void sample_hr(void*)
         rf_heart_rate_and_oxygen_saturation(fifo_spo2_buffer, BUFFER_SIZE, 
                                     fifo_hr_buffer, &pn_spo2, &spo2_valid, &heart_rate, 
                                     &heart_rate_valid, &ratio, &correl);
-        res_data.heart_rate = heart_rate;
+        // res_data.heart_rate = heart_rate;
 
         // If abnormal heart rate, send immediately to Station via BLE
         if ( (res_data.heart_rate <= HR_LOWER_THRESHOLD) || (res_data.heart_rate >= HR_UPPER_THRESHOLD) ) {
+            ESP_LOGI(BLE_TAG, "abnormal heart rate detected");
             xTaskNotifyGive(ble_advertise_task_handle);
             hr_send_wait_count = 0;
         }
-        else {
-            hr_send_wait_count++;
-            // Every 10 seconds update Station with normal Heart Rate reading
-            if (hr_send_wait_count == 10) {
-                xTaskNotifyGive(ble_advertise_task_handle);
-                hr_send_wait_count = 0;
-            }
-        }
+        // else {
+        //     hr_send_wait_count++;
+        //     // Every 10 seconds update Station with normal Heart Rate reading
+        //     if (hr_send_wait_count == 10) {
+        //         xTaskNotifyGive(ble_advertise_task_handle);
+        //         hr_send_wait_count = 0;
+        //     }
+        // }
         
         vTaskDelay(pdMS_TO_TICKS(1000)); // Take Heart Rate reading every 1 second
     }
@@ -252,10 +255,11 @@ void i2c_config_adxl()
     };
     ESP_ERROR_CHECK(i2c_master_bus_add_device(adxl_master_bus_handle, &adxl_device_config, &adxl_master_dev_handle));
 
+    ESP_LOGI(BLE_TAG, "b4 init");
     adxl345_init(adxl_master_dev_handle, adxl_master_bus_handle);
-
-    adxl345_interrupt_init(adxl_master_dev_handle, adxl_master_bus_handle, 2500, 100, 800, 200);
-
+    ESP_LOGI(BLE_TAG, "after init");
+    adxl345_interrupt_init(adxl_master_dev_handle, adxl_master_bus_handle, 2000, 100, 800, 200);
+    ESP_LOGI(BLE_TAG, "after int enable");
     /* TESTING LEDs for ADXL interrupts */
     gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
     gpio_set_pull_mode(GPIO_NUM_1, GPIO_PULLUP_PULLDOWN);

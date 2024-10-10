@@ -1,6 +1,8 @@
 // Datasheet https://www.analog.com/media/en/technical-documentation/data-sheets/adxl345.pdf
 #include "../inc/adxl345-i2c.h"
 
+#include "esp_log.h"
+
 extern i2c_master_bus_handle_t adxl_master_bus_handle;
 
 /**
@@ -13,7 +15,7 @@ void adxl345_int_tap_clear(i2c_master_dev_handle_t master_dev_handle,
         ADXL_INT_SOURCE};
     i2c_master_transmit_receive(master_dev_handle, int_source_buf, 1,
                                 int_source_buf, 1, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    // i2c_master_bus_wait_all_done(master_bus_handle, 10);
 }
 
 /**
@@ -22,21 +24,23 @@ void adxl345_int_tap_clear(i2c_master_dev_handle_t master_dev_handle,
 void adxl345_init(i2c_master_dev_handle_t master_dev_handle,
                   i2c_master_bus_handle_t master_bus_handle)
 {
+    ESP_LOGI("adxl", "in init");
     /* Power up and put into Measure Mode */
     uint8_t init_seq[2] = {
         ADXL_POWER_CTL_REG, // POWER_CTL register write
         0x08                // Put in Measure Mode
     };
     i2c_master_transmit(master_dev_handle, init_seq, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
-
+    // i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    ESP_LOGI("adxl", "0");
     /* Format Data */
     uint8_t format_data[2] = {
         ADXL_DATA_FORMAT_REG, // DATA_FORMAT register address
         0x01                  // 4g detection
     };
     i2c_master_transmit(master_dev_handle, format_data, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    i2c_master_bus_wait_all_done(master_bus_handle, 100);
+    ESP_LOGI("adxl", "2nd success");
 }
 
 /**
