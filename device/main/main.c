@@ -132,16 +132,15 @@ void ble_app_advertise(void *)
 
         /**
          * name = "Smart-Nursing-Home-Device"
-         * mfg_data = Resident's Name
-         * mfd_data_len = Length of Resident's Name
+         * uri_len = Resident ID
          * uint8_t le_role = Measured Heart Rate
          * unsigned le_role_is_present = Fall Detection flag
          * uint8_t *uri = oxygen level "XX.X%"
          */
         // Set fields according to the above mappnig
-        const uint8_t resident_name[9] = "John Doe";
-        fields.mfg_data = resident_name;
-        fields.mfg_data_len = 9;
+        // const uint8_t resident_name[9] = "John Doe";
+        // fields.mfg_data = resident_name;
+        // fields.mfg_data_len = 9;
         fields.uri_len = 0; // id
         fields.le_role = (uint8_t)res_data.heart_rate;
         fields.le_role_is_present = res_data.fall_detected;

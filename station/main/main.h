@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 
-#define ESP_WIFI_SSID "sample-ssid"
-#define ESP_WIFI_PASS "sample-pw"
+#define ESP_WIFI_SSID "chris-iphone-12"
+#define ESP_WIFI_PASS "ull-nvr-guess-this-69"
 
 #define MAX_NUM_RESIDENTS 20
 

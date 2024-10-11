@@ -403,7 +403,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
     struct ble_hs_adv_fields fields;
 
-    char res_data_buf[50]; // Buffer to hold resident data to send via MQTT
+    char res_data_buf[10]; // Buffer to hold resident data to send via MQTT
 
     switch (event->type)
     {
@@ -425,11 +425,15 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                 if (!strncmp((char *)fields.name, "ESP32-Ched", 10)) {
                     /*** Parse the fields into a message to send ***/
                     // "First Last, ID, <HR>, 1";
-                    snprintf(res_data_buf, 50, "%*s, %u, %u, %u", fields.mfg_data_len, fields.mfg_data, fields.uri_len, fields.le_role, fields.le_role_is_present);
-                    ESP_LOGI(BLE_TAG, "Resident info received: %*s", fields.mfg_data_len, fields.mfg_data);
+                    
+                    // snprintf(res_data_buf, 50, "%*s, %u, %u, %u", fields.mfg_data_len, fields.mfg_data, fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    // snprintf(res_data_buf, 7, "id: %u %u %u", fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    snprintf(res_data_buf, 10, "%u,%u,%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    // ESP_LOGI(BLE_TAG, "Resident info received: %*s", fields.mfg_data_len, fields.mfg_data);
                     // if ( fields.le_role_is_present || 
                     // ( (fields.le_role <= HR_LOWER_THRESHOLD) || (fields.le_role >= HR_UPPER_THRESHOLD) ) ) {
-                    if (!strncmp((char *)fields.mfg_data, "John Doe", 8)) {
+                    // if (!strncmp((char *)fields.mfg_data, "John Doe", 8)) {
+                    if (fields.uri_len == 0) {
                         // Emergency, immediately send to webpage
                         ESP_LOGI(BLE_TAG, "emergency mqtt send to queue!!");
                         xQueueSendToFront(g_res_mqtt_queue, res_data_buf, portMAX_DELAY);

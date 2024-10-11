@@ -17,9 +17,9 @@ When normal, healthy data is received the ESP32 stores it along with other resid
 When data indicating an abnormal heart rate or a potential fall are detected, the Station immediately alerts the nurse-monitored webpage.\
 
 Achievements
-- Emergency detection has a worst case response latency of 2 seconds assuming stable WiFi connection.
+- Emergency detection has a worst case response latency of 2 seconds assuming available stable WiFi
 - Stations can theoretically handle hundreds of incoming Device BLE signals at a time.
-- Stations can service 5 simultaneous emergencies in under 10 seconds
+- Stations can service 5 simultaneous emergencies in under 10 seconds.
 
 
 Going forward, I would like to add more peripherals to the Device, i.e. Oxygen Level sensor, temperatuer sensor, GPS.
