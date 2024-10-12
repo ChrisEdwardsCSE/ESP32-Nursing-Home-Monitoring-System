@@ -54,10 +54,9 @@ uint32_t fifo_spo2_buffer[BUFFER_SIZE];
  */
 static void IRAM_ATTR adxl_int1_isr_handler(void *arg)
 {
-    
     adxl345_int_tap_clear(adxl_master_dev_handle, adxl_master_bus_handle); // Clear interrupts
     
-    res_data.fall_detected = 1; // Set Fall Detection to 1
+    res_data.fall_detected = 1;
 
     gpio_set_level(GPIO_NUM_1, green_led_val);
     green_led_val = !green_led_val;
@@ -69,16 +68,16 @@ void app_main()
 {
     nvs_flash_init(); // Initialize NVS flash using
     nimble_port_init(); // Initialize the controller stack
-    ble_svc_gap_device_name_set("ESP32-Ched"); // Set device name characteristic
+    ble_svc_gap_device_name_set("Resident-Device"); // Set device name characteristic
     ble_svc_gap_init(); // Initialize GAP service
     ble_hs_cfg.sync_cb = ble_app_on_sync; // Set application as callback
     nimble_port_freertos_init(host_task); // Set infinite task
 
     vTaskDelay(pdMS_TO_TICKS(10));
     
-    gpio_config_adxl_int(); // Initialize GPIO pins of ADXL345 (and MAX30102)
-    i2c_config_adxl(); // Configure I2C peripheral for ADXL345
-    i2c_config_max(); // Configure I2C peripheral for MAX30102
+    gpio_config_adxl_int(); // Initialize GPIO pins of ADXL345 (and MAX30102) interrupt
+    i2c_config_adxl();
+    i2c_config_max();
 
     vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -86,18 +85,19 @@ void app_main()
     BaseType_t sample_hr_err = xTaskCreate(sample_hr, "Sample Heart Rate", 8192, NULL, 
                 configMAX_PRIORITIES-2, &sample_hr_handle);
     if (sample_hr_err != pdPASS) {
-        ESP_LOGI(BLE_TAG, "Task Create failed!!!: %d", sample_hr_err);
+        ESP_LOGI(BLE_TAG, "Task Create failed: %d", sample_hr_err);
     }
 }
 
 /**
  * Handle GAP events. No real events to handle apart from errors since
  * device only broadcasts
+ * 
+ * @param event - The BLE GAP event that triggered the call
+ * @param arg - Pointer to arguments that were passed
  */
 static int ble_gap_event(struct ble_gap_event *event, void *arg)
 {
-    printf("ble_gap_event() called\n");
-    // the different connection events we could have
     switch (event->type)
     {
         case BLE_GAP_EVENT_TERM_FAILURE:
@@ -128,7 +128,7 @@ void ble_app_advertise(void *)
 
     for (;;)
     {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait for notification[0] - Send out BLE advertisement
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait for notification[0] to send out BLE advertisement
 
         /**
          * name = "Smart-Nursing-Home-Device"
@@ -137,10 +137,6 @@ void ble_app_advertise(void *)
          * unsigned le_role_is_present = Fall Detection flag
          * uint8_t *uri = oxygen level "XX.X%"
          */
-        // Set fields according to the above mappnig
-        // const uint8_t resident_name[9] = "John Doe";
-        // fields.mfg_data = resident_name;
-        // fields.mfg_data_len = 9;
         fields.uri_len = 0; // id
         fields.le_role = (uint8_t)res_data.heart_rate;
         fields.le_role_is_present = res_data.fall_detected;
@@ -151,7 +147,7 @@ void ble_app_advertise(void *)
         int rc = ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &adv_params, ble_gap_event, NULL);
         ESP_LOGI(BLE_TAG, "Started GAP advertising: %d", rc);
 
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        vTaskDelay(pdMS_TO_TICKS(BLE_ADV_DURATION));
 
         rc = ble_gap_adv_stop();
         ESP_LOGI(BLE_TAG, "Stopped GAP advertising: %d", rc);
@@ -165,11 +161,11 @@ void ble_app_advertise(void *)
  */
 void ble_app_on_sync(void)
 {
-    /* Determines the best address type, sets ble_addr_type with it*/
+    // Determines the best address type, sets ble_addr_type with it
     int res = ble_hs_id_infer_auto(0, &ble_addr_type);
     if (res != 0)
     {
-        printf("Device Address Set Error: %d", res);
+        ESP_LOGI(BLE_TAG, "Device Address Set Error: %d", res);
     }
 
     xTaskCreate(ble_app_advertise, "Advertise",
@@ -216,14 +212,14 @@ void sample_hr(void*)
             xTaskNotifyGive(ble_advertise_task_handle);
             hr_send_wait_count = 0;
         }
-        // else {
-        //     hr_send_wait_count++;
-        //     // Every 10 seconds update Station with normal Heart Rate reading
-        //     if (hr_send_wait_count == 10) {
-        //         xTaskNotifyGive(ble_advertise_task_handle);
-        //         hr_send_wait_count = 0;
-        //     }
-        // }
+        else {
+            hr_send_wait_count++;
+            // Every 10 seconds update Station with normal Heart Rate reading
+            if (hr_send_wait_count == 10) {
+                xTaskNotifyGive(ble_advertise_task_handle);
+                hr_send_wait_count = 0;
+            }
+        }
         
         vTaskDelay(pdMS_TO_TICKS(1000)); // Take Heart Rate reading every 1 second
     }
@@ -250,21 +246,20 @@ void i2c_config_adxl()
     i2c_device_config_t adxl_device_config = {
         .dev_addr_length = I2C_ADDR_BIT_7,
         .device_address = ADXL_DEV_I2C_ADDR, // I2C device address when SDO cnctd to GND
-        .scl_speed_hz = 100000  // ADXL either 100kHz or 400kHz
+        .scl_speed_hz = 100000  // Datasheet allows either 100kHz or 400kHz
     };
     ESP_ERROR_CHECK(i2c_master_bus_add_device(adxl_master_bus_handle, &adxl_device_config, &adxl_master_dev_handle));
 
-    ESP_LOGI(BLE_TAG, "b4 init");
     adxl345_init(adxl_master_dev_handle, adxl_master_bus_handle);
-    ESP_LOGI(BLE_TAG, "after init");
+
     adxl345_interrupt_init(adxl_master_dev_handle, adxl_master_bus_handle, 2000, 100, 800, 200);
-    ESP_LOGI(BLE_TAG, "after int enable");
-    /* TESTING LEDs for ADXL interrupts */
+    
     gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
     gpio_set_pull_mode(GPIO_NUM_1, GPIO_PULLUP_PULLDOWN);
 }
+
 /**
- * Configures INT1 GPIO pin of ADXL345
+ * Configures INT1 GPIO pin of ADXL345 and MAX30102
  */
 void gpio_config_adxl_int(void)
 {
@@ -277,7 +272,6 @@ void gpio_config_adxl_int(void)
         .intr_type = GPIO_INTR_POSEDGE, // rising edge interrupt
     };
     gpio_config(&adxl_int1_gpio_config);
-
 
     gpio_install_isr_service(0);
     gpio_isr_handler_add(ADXL_IO_INT1, adxl_int1_isr_handler, NULL);

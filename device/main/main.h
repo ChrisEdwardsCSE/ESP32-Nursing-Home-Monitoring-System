@@ -5,6 +5,8 @@
 #define HR_LOWER_THRESHOLD 60
 #define HR_UPPER_THRESHOLD 130
 
+#define BLE_ADV_DURATION 10000 // BLE Advertising duration
+
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 void ble_app_advertise(void *);
 void ble_app_on_sync(void);

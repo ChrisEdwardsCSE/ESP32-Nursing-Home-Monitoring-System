@@ -3,11 +3,14 @@
 
 #include <stdint.h>
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
-#define ESP_WIFI_SSID "chris-iphone-12"
-#define ESP_WIFI_PASS "ull-nvr-guess-this-69"
+#define ESP_WIFI_SSID "sample_ssid"
+#define ESP_WIFI_PASS "sample_pw"
 
 #define MAX_NUM_RESIDENTS 20
+
+#define RES_DATA_BUF_SIZE 10
 
 // Heart Rate threshold for abnormal values in BPM
 #define HR_LOWER_THRESHOLD 60
@@ -27,6 +30,6 @@ void ble_app_scan(void);
 void ble_app_on_sync(void);
 void host_task(void *param);
 
-void mqtt_send_timer(void);
+void mqtt_send_timer_init(void);
 
 #endif
