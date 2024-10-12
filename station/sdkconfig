@@ -513,7 +513,7 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Example Configuration
 #
-CONFIG_BROKER_URL="ws://mqtt.eclipseprojects.io:80/mqtt"
+CONFIG_BROKER_URL="mqtt://mqtt.eclipseprojects.io"
 # end of Example Configuration
 
 #

@@ -13,13 +13,9 @@ window.addEventListener("load", (event) => {
   // unsubscribeBtn.addEventListener("click", function () {
   //   unsubscribeToTopic();
   // });
-
-  const clickButton = document.querySelector("button");
-  clickButton.addEventListener("click", function () {
-    console.log("yo");
-    buttonClick();
-  });
 });
+
+
 
 function connectToBroker() {
   const clientId = "client" + Math.random().toString(36).substring(7);
@@ -63,22 +59,29 @@ function connectToBroker() {
 
     // Parse message
     message = message + " ";
-    let arr_message = message.split(", ");
-    let name = arr_message[0];
-    let id = arr_message[1];
-    let heart_rate = parseInt(arr_message[2]);
-    let fall_detected = arr_message[3];
-    console.log("name:${name}, id:${id}, hr:${heart_rate}, fall:${fall_detected}");
+    let arr_message = message.split(",");
+    let res_id = arr_message[0];
+    let heart_rate = parseInt(arr_message[1]);
+    let fall_detected = arr_message[2].substring(0,1);
+    console.log("res_id: " + res_id);
+    const resident = healthy_residents_container.querySelector("#id" + res_id);
+    resident.querySelector(".heart-rate").textContent = "Heart Rate: " + heart_rate;
+    if (fall_detected == 1) {
+      resident.querySelector(".fall-detected").textContent = "Fall Detected!"
+    }
+    else {
+      resident.querySelector(".fall-detected").textContent = "No fall detected";
+    }
 
     if (fall_detected == "1" || heart_rate < heart_rate || heart_rate > 180) {
       // move to emergency
-      const emer_res = healthy_residents_container.querySelector("#id${id}");
-      emergency_residents_container.appendChild(emer_res);
+      const resident = healthy_residents_container.querySelector("#id" + res_id);
+      emergency_residents_container.appendChild(resident);
       // healthy_residents_container.removeChild(emer_res);
     }
     
     const messageTextArea = document.querySelector("#message");
-    messageTextArea.value += message + "\r\n";
+    messageTextArea.value += message.substring(0,6) + "\r\n";
   });
 }
 
@@ -89,10 +92,3 @@ function subscribeToTopic() {
   mqttClient.subscribe(topic, { qos: 0 });
 }
 
-function buttonClick() {
-  const emergency_residents_container = document.querySelector(".emergency-residents");
-  const healthy_residents_container = document.querySelector(".healthy-residents");
-  console.log("yo");
-  const emer_res = healthy_residents_container.querySelector("#id1");
-  emergency_residents_container.appendChild(emer_res);
-}

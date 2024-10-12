@@ -3,11 +3,17 @@
 
 #include <stdint.h>
 
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
-#define ESP_WIFI_SSID "chris-iphone-12"
-#define ESP_WIFI_PASS "ull-nvr-guess-this-69"
+#define ESP_WIFI_SSID "SpectrumSetup-DB"
+#define ESP_WIFI_PASS "superpear962"
 
 #define MAX_NUM_RESIDENTS 100
+
+#define RES_DATA_BUF_SIZE 10
+
+#define HR_LOWER_THRESHOLD 60
+#define HR_UPPER_THRESHOLD 130
 
 static void log_error_if_nonzero(const char *message, int error_code);
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,

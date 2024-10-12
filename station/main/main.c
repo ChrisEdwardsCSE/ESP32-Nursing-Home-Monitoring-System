@@ -289,7 +289,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         xQueueReceive(q_res_data, mqtt_send_data_buf, pdMS_TO_TICKS(100)); // Get resident data off the queue
 
-        msg_id = esp_mqtt_client_publish(client, "residents", (char *)mqtt_send_data_buf, 50, 1, 0); // Publish it
+        msg_id = esp_mqtt_client_publish(client, "residents", (char *)mqtt_send_data_buf, 17, 1, 0); // Publish it
 
         ESP_LOGI(WIFI_TAG, "sent publish successful, msg_id=%d", msg_id);
         break;
@@ -309,9 +309,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_ERROR:
         ESP_LOGI(WIFI_TAG, "MQTT_EVENT_ERROR");
         if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-            log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
-            log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
-            log_error_if_nonzero("captured as transport's socket errno",  event->error_handle->esp_transport_sock_errno);
             ESP_LOGI(WIFI_TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
         }
         break;
@@ -366,16 +363,19 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
              * unsigned le_role_is_present = Fall Detection flag
              * uint8_t *uri = oxygen level "XX.X%"
              */
-            if (strncmp("Smart-Nursing-Home-Device", (char *)fields.name, (size_t)fields.name_len)) {
+            if (fields.name_len > 0) {
+                ESP_LOGI(BLE_TAG, "BLE device found: %*s", fields.name_len, fields.name);
                 /*** Parse the fields into a message to send ***/
                 // "First Last, ID, <HR>, 1";
-                snprintf(res_data_buf, 50, "%*s, %u, %u, %u", fields.mfg_data_len, fields.mfg_data, fields.uri_len, fields.le_role, fields.le_role_is_present);
+                if (!strncmp((char *)fields.name, "Resident-Device", 15)) {
+                    snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
 
-                xQueueSend(q_res_data, res_data_buf, pdMS_TO_TICKS(100));
-                
-                ble_gap_disc_cancel();
-                vTaskDelay(pdMS_TO_TICKS(10));
-                xTaskNotifyGive(wifi_mqtt_send_msg_handle);
+                    xQueueSend(q_res_data, res_data_buf, pdMS_TO_TICKS(100));
+                    
+                    ble_gap_disc_cancel();
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    xTaskNotifyGive(wifi_mqtt_send_msg_handle);
+                }
             }
             break;
         default:
