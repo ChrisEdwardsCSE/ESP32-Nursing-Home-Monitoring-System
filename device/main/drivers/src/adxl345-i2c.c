@@ -69,7 +69,7 @@ void adxl345_interrupt_init(i2c_master_dev_handle_t master_dev_handle, i2c_maste
         (uint8_t)(1 << 2) // SINGLE_TAP on INT1, FREE_FALL on INT2,
     };
     i2c_master_transmit(master_dev_handle, int_mapping_buf, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    i2c_master_bus_wait_all_done(master_bus_handle, 100);
 
 #if ADXL_DEBUG
     i2c_master_transmit_receive(master_dev_handle, int_mapping_buf,
@@ -85,7 +85,7 @@ void adxl345_interrupt_init(i2c_master_dev_handle_t master_dev_handle, i2c_maste
         ADXL_INT_THRESH_TAP_REG,
         (uint8_t)int_thresh_tap};
     i2c_master_transmit(master_dev_handle, int_thresh_tap_buf, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    i2c_master_bus_wait_all_done(master_bus_handle, 100);
 #if ADXL_DEBUG
     i2c_master_transmit_receive(master_dev_handle, int_thresh_tap_buf,
                                 1, error_check_buf, 1, 100);
@@ -99,7 +99,7 @@ void adxl345_interrupt_init(i2c_master_dev_handle_t master_dev_handle, i2c_maste
         ADXL_INT_THRESH_DUR_REG,
         int_thresh_dur};
     i2c_master_transmit(master_dev_handle, int_thresh_dur_buf, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    i2c_master_bus_wait_all_done(master_bus_handle, 100);
 #if ADXL_DEBUG
     i2c_master_transmit_receive(master_dev_handle, int_thresh_dur_buf,
                                 1, error_check_buf, 1, 100);
@@ -114,7 +114,7 @@ void adxl345_interrupt_init(i2c_master_dev_handle_t master_dev_handle, i2c_maste
         ADXL_INT_THRESH_FF_REG,
         int_thresh_ff};
     i2c_master_transmit(master_dev_handle, int_thresh_ff_buf, 2, 100);
-    i2c_master_bus_wait_all_done(master_bus_handle, 10);
+    i2c_master_bus_wait_all_done(master_bus_handle, 100);
 #if ADXL_DEBUG
     i2c_master_transmit_receive(master_dev_handle, int_thresh_ff_buf,
                                 1, error_check_buf, 1, 100);

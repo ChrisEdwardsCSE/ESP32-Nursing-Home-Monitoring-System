@@ -124,7 +124,7 @@ void mqtt_send_timer_init(void)
     gptimer_new_timer(&timer_config, &timer_handle);
 
     gptimer_alarm_config_t timer_alarm_config = {
-        .alarm_count = 1000000, // period = 20 seconds
+        .alarm_count = 10000000, // period = 20 seconds
         .reload_count = 0,
         .flags.auto_reload_on_alarm = 0,
     };
@@ -391,7 +391,11 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
     struct ble_hs_adv_fields fields; // BLE Advertisement fields to set
 
     char res_data_buf[RES_DATA_BUF_SIZE]; // Buffer to hold resident data to send via MQTT
-
+    static int gen = 40;
+    static uint8_t c = 0;
+    static uint8_t rand_val = 0;
+    srand(gen);
+    gen += 4;
     switch (event->type)
     {
         // Discovery event (received advertisement)
@@ -406,13 +410,22 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
              * uint8_t *uri = oxygen level "XX.X%"
              */
             if (fields.name_len > 0) {
+                if (c == 4) {
+
+                }
                 ESP_LOGI(BLE_TAG, "BLE device found: %*s", fields.name_len, fields.name);
                 if (!strncmp((char *)fields.name, "Resident-Device", 15)) {
-
+                    ESP_LOGI(BLE_TAG, "res info: id:%u, hr:%u, fall:%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    rand_val = rand() % (78 + 1 - 68) + 68;
                     // TODO : change to JSON format or something cleaner
-                    snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    // snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
+                    if (c == 16) {
+                        rand_val = 4;
+                    }
+                    snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, rand_val, fields.le_role_is_present);
 
-                    if (fields.le_role_is_present == 1 || fields.le_role <= HR_LOWER_THRESHOLD || fields.le_role >= HR_UPPER_THRESHOLD) {
+                    // if (fields.le_role_is_present == 1 || fields.le_role <= HR_LOWER_THRESHOLD || fields.le_role >= HR_UPPER_THRESHOLD) {
+                    if (fields.uri_len == 0) {
                         // Emergency detected, immediately send to webpage
                         ESP_LOGI(BLE_TAG, "emergency mqtt send to queue!!");
                         xQueueSendToFront(g_res_mqtt_queue, res_data_buf, portMAX_DELAY);
@@ -425,8 +438,8 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                             xQueueSend(g_res_mqtt_queue, res_data_buf, pdMS_TO_TICKS(10)); // Add Resident's data to Queue & track it
                             g_res_ble_arr[fields.uri_len] = 1; // 
                         }
-
                     }
+                    c++;
                 }
             }
             break;

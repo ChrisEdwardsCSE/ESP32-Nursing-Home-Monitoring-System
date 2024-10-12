@@ -167,7 +167,6 @@ void rf_heart_rate_and_oxygen_saturation(uint32_t *pun_ir_buffer, int32_t n_ir_b
     }
     else
     {
-        ESP_LOGI("algo", "-999 found 0");
         n_last_peak_interval = LOWEST_PERIOD;
         *pn_heart_rate = -999; // unable to calculate because signal looks aperiodic
         *pch_hr_valid = 0;

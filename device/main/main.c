@@ -48,7 +48,7 @@ struct resident_data res_data;
 uint32_t fifo_hr_buffer[BUFFER_SIZE];
 uint32_t fifo_spo2_buffer[BUFFER_SIZE];
 
-
+uint8_t not_advertising = 1;
 /**
  * ISR for Physical Trauma event from ADXL345
  */
@@ -128,7 +128,9 @@ void ble_app_advertise(void *)
 
     for (;;)
     {
+        ESP_LOGI(BLE_TAG, "b4");
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // Wait for notification[0] to send out BLE advertisement
+        ESP_LOGI(BLE_TAG, "after");
 
         /**
          * name = "Smart-Nursing-Home-Device"
@@ -146,10 +148,13 @@ void ble_app_advertise(void *)
         ESP_LOGI(BLE_TAG, "name: %*s", fields.name_len, fields.name);
         int rc = ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &adv_params, ble_gap_event, NULL);
         ESP_LOGI(BLE_TAG, "Started GAP advertising: %d", rc);
+        not_advertising = 0;
 
         vTaskDelay(pdMS_TO_TICKS(BLE_ADV_DURATION));
 
+        not_advertising = 1;
         rc = ble_gap_adv_stop();
+        
         ESP_LOGI(BLE_TAG, "Stopped GAP advertising: %d", rc);
 
         res_data.fall_detected = 0; // Reset fall detected
@@ -181,6 +186,7 @@ void host_task(void *param)
     nimble_port_run(); // This function will return only when nimble_port_stop() is executed
 }
 
+uint8_t test_data[30];
 /**
  * Sample resident's heart rate
  */
@@ -193,7 +199,8 @@ void sample_hr(void*)
     int8_t spo2_valid;
     float ratio, correl;
     res_data.heart_rate = 80;
-
+    srand(70);
+    int c = 0;
     for (;;) {
         // Take samples
         for (int i = 0; i < BUFFER_SIZE; i++)
@@ -204,7 +211,9 @@ void sample_hr(void*)
         rf_heart_rate_and_oxygen_saturation(fifo_spo2_buffer, BUFFER_SIZE, 
                                     fifo_hr_buffer, &pn_spo2, &spo2_valid, &heart_rate, 
                                     &heart_rate_valid, &ratio, &correl);
-        // res_data.heart_rate = heart_rate;
+
+        res_data.heart_rate = rand() % (78 + 1 - 68) + 68;
+
 
         // If abnormal heart rate, send immediately to Station via BLE
         if ( (res_data.heart_rate <= HR_LOWER_THRESHOLD) || (res_data.heart_rate >= HR_UPPER_THRESHOLD) ) {
@@ -212,16 +221,18 @@ void sample_hr(void*)
             xTaskNotifyGive(ble_advertise_task_handle);
             hr_send_wait_count = 0;
         }
-        else {
+        else if (not_advertising) {
             hr_send_wait_count++;
             // Every 10 seconds update Station with normal Heart Rate reading
-            if (hr_send_wait_count == 10) {
+            ESP_LOGI(BLE_TAG, "inc hr_send-wait & not_advertising: %u, %u", hr_send_wait_count, not_advertising);
+            if (hr_send_wait_count == 4) {
                 xTaskNotifyGive(ble_advertise_task_handle);
                 hr_send_wait_count = 0;
             }
         }
         
         vTaskDelay(pdMS_TO_TICKS(1000)); // Take Heart Rate reading every 1 second
+        c++;
     }
 }
 

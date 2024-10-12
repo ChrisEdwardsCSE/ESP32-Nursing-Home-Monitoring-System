@@ -13,12 +13,6 @@ window.addEventListener("load", (event) => {
   // unsubscribeBtn.addEventListener("click", function () {
   //   unsubscribeToTopic();
   // });
-
-  const clickButton = document.querySelector("button");
-  clickButton.addEventListener("click", function () {
-    console.log("yo");
-    buttonClick();
-  });
 });
 
 function connectToBroker() {
@@ -67,25 +61,30 @@ function connectToBroker() {
     let res_id = arr_message[0];
     let heart_rate = parseInt(arr_message[1]);
     let fall_detected = arr_message[2].substring(0,1);
-    console.log("res_id: " + res_id);
+    console.log("res_id: " + res_id + "hr: " + heart_rate + "fall detected: " + fall_detected);
     const resident = healthy_residents_container.querySelector("#id" + res_id);
-    resident.querySelector(".heart-rate").textContent = "Heart Rate: " + heart_rate;
-    if (fall_detected == 1) {
-      resident.querySelector(".fall-detected").textContent = "Fall Detected!"
-    }
-    else {
-      resident.querySelector(".fall-detected").textContent = "No fall detected";
+    let t = 0;
+    if (t == 0) {
+      resident.querySelector(".heart-rate").textContent = "Heart Rate: " + heart_rate;
+      if (fall_detected == 1) {
+        resident.querySelector(".fall-detected").textContent = "Fall Detected!"
+      }
+      else {
+        resident.querySelector(".fall-detected").textContent = "No fall detected";
+      }
+  
+      if (fall_detected == "1" || heart_rate < 60 || heart_rate > 180) {
+        // move to emergency
+        const resident = healthy_residents_container.querySelector("#id" + res_id);
+        emergency_residents_container.appendChild(resident);
+        // healthy_residents_container.removeChild(emer_res);
+        t=1;
+      }
     }
 
-    if (fall_detected == "1" || heart_rate < heart_rate || heart_rate > 180) {
-      // move to emergency
-      const resident = healthy_residents_container.querySelector("#id" + res_id);
-      emergency_residents_container.appendChild(resident);
-      // healthy_residents_container.removeChild(emer_res);
-    }
     
     const messageTextArea = document.querySelector("#message");
-    messageTextArea.value += message + "\r\n";
+    messageTextArea.value += message.substring(0,7) + "\r\n";
   });
 }
 
