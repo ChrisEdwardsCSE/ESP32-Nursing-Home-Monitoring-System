@@ -419,7 +419,7 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
                     rand_val = rand() % (78 + 1 - 68) + 68;
                     // TODO : change to JSON format or something cleaner
                     // snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, fields.le_role, fields.le_role_is_present);
-                    if (c == 2) {
+                    if (c == 16) {
                         rand_val = 4;
                     }
                     snprintf(res_data_buf, RES_DATA_BUF_SIZE, "%u,%u,%u", fields.uri_len, rand_val, fields.le_role_is_present);
