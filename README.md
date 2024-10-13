@@ -1,5 +1,7 @@
 # ESP32 Nursing Home Monitoring System
 
+[Demo Video](https://youtu.be/p48WhBOY-2Q)
+
 Hi! This project uses ESP32 microcontrollers and the ESP-IDF framework to create an embedded Nursing Home Monitoring System.
 
 Each resident wears a low-power **Device** that monitors their heart rate and detects any physical falls. Resident data is sent via BLE to nearby **Stations** which then serve a webpage monitored by the nursing staff via MQTT over WebSockets. 
@@ -18,8 +20,8 @@ When data indicating an abnormal heart rate or a potential fall are detected, th
 
 Achievements
 - Emergency detection has a worst case response latency of 2 seconds assuming available stable WiFi
-- Stations can theoretically handle hundreds of incoming Device BLE signals at a time.
-- Stations can service 5 simultaneous emergencies in under 10 seconds.
+- Stations can theoretically handle hundreds of incoming Device BLE signals at a time
+- Stations can service 5 simultaneous emergencies in less than 6 seconds on average
 
 
 Going forward, I would like to add more peripherals to the Device, i.e. Oxygen Level sensor, temperatuer sensor, GPS.
